@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Slides</title>
+<script src="slides_assets/mermaid.min.js"></script>
+<script>
+/* CDN fallback: if the vendored copy is missing (deck moved without its assets folder),
+   pull the same pinned version the rest of the app uses (viewer.html:12). */
+if (typeof mermaid === "undefined") {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"><\/script>');
+}
+</script>
+<style>
+  :root{
+    --bg:#0d1117; --bg-alt:#161b22; --bg-soft:#1c2128; --panel:#10151c;
+    --txt:#e6edf3; --txt-dim:#9aa7b4; --txt-faint:#6e7b8a;
+    --line:#26303b; --accent:#58a6ff; --accent-2:#3fb950;
+    --code-bg:#0a0e14; --chip:#1f2630;
+    --s1:#58a6ff; --s2:#3fb950; --s3:#d2a8ff; --s4:#f0883e; --s5:#ff7b72; --s6:#56d4dd;
+    --warn:#f0883e; --bad:#ff7b72; --good:#3fb950;
+    --radius:10px;
+  }
+  html[data-theme="light"]{
+    --bg:#ffffff; --bg-alt:#f6f8fa; --bg-soft:#eef1f5; --panel:#ffffff;
+    --txt:#1f2328; --txt-dim:#57606a; --txt-faint:#8c959f;
+    --line:#d0d7de; --accent:#0969da; --accent-2:#1a7f37;
+    --code-bg:#f6f8fa; --chip:#eaeef2;
+    --warn:#bc4c00; --bad:#cf222e; --good:#1a7f37;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--txt);-webkit-font-smoothing:antialiased;
+  }
+  code,.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+
+  /* ── viewport + scaling ───────────────────────────────────────────── */
+  #viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+  #stage{
+    width:1280px;height:720px;flex:0 0 auto;transform-origin:center center;
+    position:relative;
+  }
+  .slide{
+    position:absolute;inset:0;width:1280px;height:720px;
+    background:var(--bg);color:var(--txt);
+    padding:56px 72px;display:none;flex-direction:column;overflow:hidden;
+  }
+  .slide.current{display:flex;animation:slideIn .22s ease}
+  @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* ── slide furniture ──────────────────────────────────────────────── */
+  .kicker{
+    font-size:14px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
+    color:var(--accent);margin:0 0 14px;display:flex;align-items:center;gap:10px;flex:0 0 auto;
+  }
+  .kicker .num{
+    background:var(--chip);color:var(--txt-dim);border-radius:999px;
+    padding:2px 10px;font-size:12px;letter-spacing:.06em;
+  }
+  h1.s-title{font-size:46px;line-height:1.14;margin:0 0 10px;font-weight:800;letter-spacing:-.02em;flex:0 0 auto}
+  h2.s-title{font-size:38px;line-height:1.18;margin:0 0 14px;font-weight:750;letter-spacing:-.015em;flex:0 0 auto}
+  .lead{font-size:23px;line-height:1.45;color:var(--txt-dim);margin:0 0 20px;max-width:1000px;flex:0 0 auto}
+  .lead strong{color:var(--txt)}
+  /* content centres in the space left under the title; full slides still fill it */
+  .s-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:18px;
+    overflow:hidden;justify-content:center}
+  .s-foot{flex:0 0 auto;margin-top:14px;font-size:14px;color:var(--txt-faint);line-height:1.5}
+
+  /* bullets */
+  ul.bul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px}
+  ul.bul li{
+    position:relative;padding-left:30px;font-size:20px;line-height:1.5;color:var(--txt-dim);
+  }
+  ul.bul li::before{
+    content:"";position:absolute;left:6px;top:11px;width:9px;height:9px;border-radius:2px;
+    background:var(--accent);transform:rotate(45deg);
+  }
+  ul.bul li b,ul.bul li strong{color:var(--txt);font-weight:700}
+  ul.bul.tight li{font-size:18px;gap:9px}
+
+  /* columns / cards */
+  /* cards hug their content instead of stretching to the bottom of the slide */
+  .cols{display:grid;gap:18px;flex:0 1 auto;min-height:0;align-items:stretch}
+  .cols.c2{grid-template-columns:1fr 1fr}
+  .cols.c3{grid-template-columns:1fr 1fr 1fr}
+  .card{
+    background:var(--bg-alt);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;display:flex;flex-direction:column;gap:10px;min-height:0;overflow:hidden;
+  }
+  .card h3{
+    margin:0;font-size:17px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--accent);font-weight:750;
+  }
+  .card.good h3{color:var(--good)} .card.bad h3{color:var(--bad)} .card.warn h3{color:var(--warn)}
+  .card.good{border-color:color-mix(in srgb,var(--good) 40%,var(--line))}
+  .card.bad{border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+  .card p{margin:0;font-size:17px;line-height:1.5;color:var(--txt-dim)}
+  .card ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px}
+  .card li{font-size:16px;line-height:1.45;color:var(--txt-dim)}
+  .card li b{color:var(--txt)}
+  .card .big{font-size:34px;font-weight:800;color:var(--txt);letter-spacing:-.02em;line-height:1.1}
+  .card .sub{font-size:14px;color:var(--txt-faint)}
+
+  /* split layout: text left, visual right */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:26px;flex:1 1 auto;min-height:0}
+  .split.wide-r{grid-template-columns:.85fr 1.15fr}
+  .split.wide-l{grid-template-columns:1.15fr .85fr}
+  .split > *{min-width:0;min-height:0}
+
+  /* table */
+  .tbl-wrap{overflow:hidden;border:1px solid var(--line);border-radius:var(--radius);flex:0 1 auto}
+  table.tbl{width:100%;border-collapse:collapse;font-size:16px}
+  table.tbl th{
+    background:var(--bg-soft);text-align:left;padding:11px 14px;font-size:13px;
+    letter-spacing:.07em;text-transform:uppercase;color:var(--txt-dim);font-weight:700;
+    border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  table.tbl td{padding:10px 14px;border-bottom:1px solid var(--line);color:var(--txt-dim);line-height:1.4;vertical-align:top}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl td b,table.tbl td strong{color:var(--txt)}
+  table.tbl tr.hl td{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--txt)}
+  table.tbl tr.hl td b{color:var(--accent)}
+  table.tbl.sm{font-size:14px}
+  table.tbl.sm th{padding:8px 11px;font-size:11px}
+  table.tbl.sm td{padding:7px 11px}
+
+  /* chips (keywords) */
+  .chipgrid{display:flex;flex-direction:column;gap:16px}
+  .chiprow{display:flex;flex-direction:column;gap:9px}
+  .chiprow .lbl{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-faint);font-weight:700}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{
+    background:var(--chip);border:1px solid var(--line);border-radius:999px;
+    padding:7px 15px;font-size:15px;color:var(--txt);white-space:nowrap;
+  }
+  .chip.key{border-color:var(--accent);color:var(--accent);font-weight:650}
+
+  /* arrow / compare rows (limitation -> contribution) */
+  .arrows{display:flex;flex-direction:column;gap:11px;flex:1 1 auto;min-height:0}
+  .arow{
+    display:grid;grid-template-columns:1fr 44px 1fr;gap:12px;align-items:stretch;
+  }
+  .arow .from,.arow .to{
+    border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;
+    font-size:16px;line-height:1.42;background:var(--bg-alt);color:var(--txt-dim);
+  }
+  .arow .from{border-left:3px solid var(--bad)}
+  .arow .to{border-left:3px solid var(--good);color:var(--txt)}
+  .arow .from b,.arow .to b{color:var(--txt)}
+  .arow .mid{display:grid;place-items:center;color:var(--accent);font-size:22px;font-weight:700}
+
+  /* analogy slide */
+  .slide.analogy{
+    background:linear-gradient(140deg,var(--bg-alt) 0%,var(--bg) 55%);
+  }
+  /* kicker stays pinned at the top; the metaphor block centres in what is left */
+  .analogy-wrap{
+    display:grid;grid-template-columns:auto 1fr;gap:34px;align-items:center;
+    margin:auto 0;
+  }
+  .analogy .icon{font-size:130px;line-height:1;filter:saturate(.9)}
+  .analogy .metaphor{
+    font-size:33px;line-height:1.35;font-weight:600;color:var(--txt);margin:0 0 22px;letter-spacing:-.01em;
+  }
+  .analogy .metaphor em{color:var(--accent);font-style:normal}
+  .maprow{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+  .maprow .m{
+    display:grid;grid-template-columns:minmax(0,1fr) 30px minmax(0,1.25fr);
+    gap:12px;align-items:center;font-size:17px;
+  }
+  .maprow .m .a{color:var(--txt-dim);text-align:right}
+  .maprow .m .arw{color:var(--txt-faint);text-align:center}
+  .maprow .m .b{color:var(--txt);font-weight:600}
+
+  /* callout */
+  .callout{
+    border-left:3px solid var(--accent);background:var(--bg-alt);
+    padding:14px 18px;border-radius:0 var(--radius) var(--radius) 0;
+    font-size:17px;line-height:1.5;color:var(--txt-dim);
+  }
+  .callout b{color:var(--txt)}
+  .callout.warn{border-left-color:var(--warn)}
+  .callout.bad{border-left-color:var(--bad)}
+  .callout .tag{
+    display:inline-block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    font-weight:700;color:var(--accent);margin-right:9px;
+  }
+  .callout.warn .tag{color:var(--warn)} .callout.bad .tag{color:var(--bad)}
+
+  /* mermaid + figures */
+  .viz{
+    flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;
+    background:var(--bg-alt);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;position:relative;overflow:hidden;cursor:zoom-in;
+  }
+  .viz > .inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  .viz svg{max-width:100%;max-height:100%;height:auto}
+  .viz img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
+  .viz .zoomhint{
+    position:absolute;right:9px;bottom:7px;font-size:11px;color:var(--txt-faint);
+    background:var(--bg);padding:2px 8px;border-radius:999px;border:1px solid var(--line);opacity:.8;
+  }
+  .figcap{flex:0 0 auto;font-size:14px;color:var(--txt-faint);margin-top:9px;line-height:1.45;text-align:center}
+  .mermaid-src{display:none}
+
+  /* title slide */
+  .slide.cover{justify-content:center;background:radial-gradient(1100px 620px at 22% 18%,var(--bg-alt),var(--bg))}
+  .cover .eyebrow{font-size:15px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:22px}
+  .cover h1{font-size:60px;line-height:1.08;margin:0 0 20px;font-weight:800;letter-spacing:-.025em;max-width:1050px}
+  .cover .thesis{font-size:24px;line-height:1.45;color:var(--txt-dim);max-width:930px;margin:0 0 30px;border-left:3px solid var(--accent);padding-left:20px}
+  .cover .meta{display:flex;gap:26px;flex-wrap:wrap;font-size:16px;color:var(--txt-faint)}
+  .cover .meta b{color:var(--txt-dim);font-weight:600}
+
+  /* section divider */
+  .slide.divider{justify-content:center;align-items:flex-start;background:linear-gradient(120deg,var(--bg-alt),var(--bg))}
+  .divider .big-num{font-size:110px;font-weight:800;color:var(--chip);line-height:1;margin-bottom:6px;letter-spacing:-.04em}
+  .divider h2{font-size:52px;margin:0 0 14px;font-weight:800;letter-spacing:-.02em}
+  .divider p{font-size:21px;color:var(--txt-dim);margin:0;max-width:860px;line-height:1.5}
+
+  /* toc */
+  .toclist{display:grid;grid-template-columns:1fr 1fr;gap:13px 26px;flex:0 1 auto;min-height:0;align-content:start}
+  .tocitem{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:baseline}
+  .tocitem .n{
+    font-size:13px;font-weight:700;color:var(--accent);background:var(--chip);
+    border-radius:6px;padding:3px 0;text-align:center;
+  }
+  .tocitem .t{font-size:17px;font-weight:650;color:var(--txt);line-height:1.35}
+  .tocitem .d{grid-column:2;font-size:14.5px;color:var(--txt-faint);line-height:1.4;margin-top:2px}
+
+  /* stat row */
+  .stats{display:grid;gap:14px;grid-auto-flow:column;grid-auto-columns:1fr}
+  .stat{background:var(--bg-alt);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .stat .v{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent);line-height:1.1}
+  .stat .k{font-size:13px;color:var(--txt-faint);margin-top:5px;line-height:1.35}
+  .stat.good .v{color:var(--good)} .stat.bad .v{color:var(--bad)} .stat.warn .v{color:var(--warn)}
+
+  /* ── chrome: progress, hud, notes, grid, lightbox ─────────────────── */
+  #progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);z-index:60;transition:width .2s ease;width:0}
+  #hud{
+    position:fixed;bottom:14px;right:16px;z-index:60;display:flex;align-items:center;gap:6px;
+    background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);
+    border-radius:999px;padding:6px 10px;backdrop-filter:blur(8px);font-size:13px;color:var(--txt-dim);
+  }
+  #hud button{
+    background:none;border:none;color:var(--txt-dim);cursor:pointer;font-size:15px;
+    padding:4px 7px;border-radius:7px;line-height:1;font-family:inherit;
+  }
+  #hud button:hover{background:var(--chip);color:var(--txt)}
+  #hud button.on{color:var(--accent)}
+  #hud .count{padding:0 8px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #hud .sep{width:1px;height:16px;background:var(--line)}
+  body[data-mode="grid"] #hud .navonly{display:none}
+
+  #notes{
+    position:fixed;left:0;right:0;bottom:0;z-index:55;max-height:38vh;overflow-y:auto;
+    background:color-mix(in srgb,var(--panel) 96%,transparent);border-top:1px solid var(--line);
+    padding:18px 26px 60px;display:none;backdrop-filter:blur(10px);
+  }
+  body[data-notes="1"] #notes{display:block}
+  #notes .nh{
+    font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);
+    font-weight:700;margin-bottom:8px;display:flex;gap:10px;align-items:center;
+  }
+  #notes .nh .dur{color:var(--txt-faint);font-weight:600;letter-spacing:.04em;text-transform:none}
+  #notes .nb{font-size:16px;line-height:1.62;color:var(--txt-dim);max-width:1100px;white-space:pre-wrap}
+
+  /* grid overview */
+  #grid{
+    position:fixed;inset:0;z-index:50;background:var(--bg);overflow-y:auto;
+    padding:26px;display:none;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));
+    gap:16px;align-content:start;
+  }
+  body[data-mode="grid"] #grid{display:grid}
+  body[data-mode="grid"] #viewport{visibility:hidden}
+  .thumb{
+    border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;
+    background:var(--bg-alt);position:relative;aspect-ratio:16/9;
+  }
+  .thumb:hover{border-color:var(--accent)}
+  .thumb.cur{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent)}
+  .thumb .tin{
+    position:absolute;inset:0;padding:14px 16px;display:flex;flex-direction:column;gap:6px;overflow:hidden;
+  }
+  .thumb .tk{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .thumb .tt{font-size:15px;font-weight:700;line-height:1.25;color:var(--txt)}
+  .thumb .tn{
+    position:absolute;right:7px;bottom:5px;font-size:10px;color:var(--txt-faint);
+    background:var(--bg);padding:1px 7px;border-radius:999px;
+  }
+
+  /* lightbox */
+  #lb{
+    position:fixed;inset:0;z-index:80;background:color-mix(in srgb,var(--bg) 96%,transparent);
+    display:none;align-items:center;justify-content:center;
+  }
+  #lb.on{display:flex}
+  #lb .lbstage{width:94vw;height:88vh;display:grid;place-items:center;overflow:hidden;cursor:grab}
+  #lb .lbstage.drag{cursor:grabbing}
+  #lb .lbinner{transform-origin:center center;display:grid;place-items:center}
+  #lb svg,#lb img{max-width:92vw;max-height:86vh;height:auto}
+  #lb .lbbar{
+    position:fixed;top:14px;right:16px;display:flex;gap:4px;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 9px;
+  }
+  #lb .lbbar button{background:none;border:none;color:var(--txt-dim);cursor:pointer;font-size:15px;padding:4px 8px;border-radius:6px;font-family:inherit}
+  #lb .lbbar button:hover{background:var(--chip);color:var(--txt)}
+
+  /* help */
+  #help{
+    position:fixed;inset:0;z-index:90;background:color-mix(in srgb,var(--bg) 92%,transparent);
+    display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px);
+  }
+  #help.on{display:flex}
+  #help .hbox{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:30px 36px;
+    max-width:560px;
+  }
+  #help h3{margin:0 0 18px;font-size:19px}
+  #help dl{display:grid;grid-template-columns:auto 1fr;gap:10px 18px;margin:0;font-size:15px}
+  #help dt{text-align:right}
+  #help kbd{
+    background:var(--chip);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;
+    padding:2px 8px;font-size:12.5px;font-family:ui-monospace,Consolas,monospace;color:var(--txt);
+  }
+  #help dd{margin:0;color:var(--txt-dim)}
+
+  #toast{
+    position:fixed;bottom:66px;left:50%;transform:translateX(-50%);z-index:70;
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    padding:8px 18px;font-size:14px;color:var(--txt-dim);opacity:0;transition:opacity .25s;pointer-events:none;
+  }
+  #toast.on{opacity:1}
+
+  /* ── print: one slide per page ────────────────────────────────────── */
+  @media print{
+    @page{size:1280px 720px;margin:0}
+    html,body{height:auto;overflow:visible;background:#fff}
+    #viewport{position:static;display:block;overflow:visible}
+    #stage{width:auto;height:auto;transform:none!important}
+    #hud,#notes,#grid,#lb,#help,#progress,#toast{display:none!important}
+    .slide{
+      position:relative;display:flex!important;page-break-after:always;break-after:page;
+      width:1280px;height:720px;animation:none;
+    }
+  }
+</style>
+</head>
+<body data-mode="deck" data-notes="0">
+
+<div id="progress"></div>
+
+<div id="viewport"><div id="stage"></div></div>
+
+<div id="grid"></div>
+
+<div id="notes">
+  <div class="nh"><span>Speaker script</span><span class="dur" id="notedur"></span></div>
+  <div class="nb" id="notebody"></div>
+</div>
+
+<div id="hud">
+  <button id="b-prev" class="navonly" title="Previous (←)">‹</button>
+  <span class="count navonly"><span id="cur">1</span>/<span id="tot">1</span></span>
+  <button id="b-next" class="navonly" title="Next (→)">›</button>
+  <span class="sep"></span>
+  <button id="b-play" title="Play narration (P)">▶</button>
+  <button id="b-auto" title="Auto-advance when the clip ends (A)">⇥</button>
+  <span class="sep"></span>
+  <button id="b-notes" title="Speaker script (S)">☰</button>
+  <button id="b-grid" title="Overview (G)">▦</button>
+  <button id="b-theme" title="Theme (T)">◐</button>
+  <button id="b-help" title="Shortcuts (?)">?</button>
+</div>
+
+<div id="lb">
+  <div class="lbbar">
+    <button id="lb-out" title="Zoom out">−</button>
+    <button id="lb-in" title="Zoom in">+</button>
+    <button id="lb-reset" title="Reset">⟲</button>
+    <button id="lb-close" title="Close (Esc)">✕</button>
+  </div>
+  <div class="lbstage" id="lbstage"><div class="lbinner" id="lbinner"></div></div>
+</div>
+
+<div id="help"><div class="hbox">
+  <h3>Keyboard</h3>
+  <dl>
+    <dt><kbd>→</kbd> <kbd>Space</kbd></dt><dd>Next slide</dd>
+    <dt><kbd>←</kbd></dt><dd>Previous slide</dd>
+    <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>First / last slide</dd>
+    <dt><kbd>G</kbd></dt><dd>Overview grid</dd>
+    <dt><kbd>S</kbd></dt><dd>Speaker script</dd>
+    <dt><kbd>P</kbd></dt><dd>Play / pause narration</dd>
+    <dt><kbd>A</kbd></dt><dd>Auto-advance with audio</dd>
+    <dt><kbd>T</kbd></dt><dd>Dark / light theme</dd>
+    <dt><kbd>F</kbd></dt><dd>Fullscreen</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Close overlay</dd>
+    <dt><kbd>?</kbd></dt><dd>This help</dd>
+  </dl>
+</div></div>
+
+<div id="toast"></div>
+
+<audio id="au" preload="none"></audio>
+
+<script>
+/* ===== injected by slides_build.py ===== */
+const META   = /*__META__*/ {"title":"Paper Slides","deck":"deck"};
+const SLIDES = /*__SLIDES__*/ [];
+const AUDIO  = /*__AUDIO__*/ {};
+</script>
+
+<script>
+(function(){
+"use strict";
+
+const $ = s => document.querySelector(s);
+const stage = $("#stage"), grid = $("#grid"), au = $("#au");
+let idx = 0, autoAdv = false, lbScale = 1, lbX = 0, lbY = 0;
+
+document.title = META.title || "Paper Slides";
+
+/* ── text helpers ─────────────────────────────────────────────────── */
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+/* tiny inline markup so deck JSON stays readable: **bold**, `code`, *accent* */
+function fmt(s){
+  return esc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[\s(])\*([^*]+)\*/g, '$1<em>$2</em>');
+}
+function li(items, cls){
+  if (!items || !items.length) return "";
+  return `<ul class="bul${cls ? " " + cls : ""}">` +
+    items.map(x => `<li>${fmt(typeof x === "string" ? x : (x.h ? "**" + x.h + "** — " : "") + (x.t || ""))}</li>`).join("") +
+    `</ul>`;
+}
+
+/* ── block renderers ──────────────────────────────────────────────── */
+function bTable(t){
+  if (!t) return "";
+  const head = (t.head || []).map(h => `<th>${fmt(h)}</th>`).join("");
+  const rows = (t.rows || []).map(r => {
+    const cells = Array.isArray(r) ? r : r.cells;
+    const hl = (!Array.isArray(r) && r.hl) ? ' class="hl"' : "";
+    return `<tr${hl}>` + cells.map(c => `<td>${fmt(c)}</td>`).join("") + `</tr>`;
+  }).join("");
+  return `<div class="tbl-wrap"><table class="tbl${t.sm ? " sm" : ""}">` +
+    (head ? `<thead><tr>${head}</tr></thead>` : "") + `<tbody>${rows}</tbody></table></div>` +
+    (t.note ? `<div class="s-foot">${fmt(t.note)}</div>` : "");
+}
+function bCards(cards){
+  if (!cards || !cards.length) return "";
+  const n = Math.min(cards.length, 3);
+  return `<div class="cols c${n}">` + cards.map(c =>
+    `<div class="card${c.tone ? " " + c.tone : ""}">` +
+      (c.title ? `<h3>${fmt(c.title)}</h3>` : "") +
+      (c.big ? `<div class="big">${fmt(c.big)}</div>` : "") +
+      (c.text ? `<p>${fmt(c.text)}</p>` : "") +
+      (c.items ? `<ul>${c.items.map(i => `<li>${fmt(i)}</li>`).join("")}</ul>` : "") +
+      (c.sub ? `<div class="sub">${fmt(c.sub)}</div>` : "") +
+    `</div>`).join("") + `</div>`;
+}
+function bChips(groups){
+  if (!groups) return "";
+  return `<div class="chipgrid">` + groups.map(g =>
+    `<div class="chiprow"><div class="lbl">${fmt(g.label)}</div><div class="chips">` +
+      g.items.map(w => {
+        const key = typeof w === "object" && w.key;
+        const txt = typeof w === "object" ? w.t : w;
+        return `<span class="chip${key ? " key" : ""}">${esc(txt)}</span>`;
+      }).join("") +
+    `</div></div>`).join("") + `</div>`;
+}
+function bArrows(rows){
+  if (!rows) return "";
+  return `<div class="arrows">` + rows.map(r =>
+    `<div class="arow"><div class="from">${fmt(r.from)}</div>` +
+    `<div class="mid">→</div><div class="to">${fmt(r.to)}</div></div>`).join("") + `</div>`;
+}
+function bStats(st){
+  if (!st) return "";
+  return `<div class="stats">` + st.map(s =>
+    `<div class="stat${s.tone ? " " + s.tone : ""}"><div class="v">${fmt(s.v)}</div><div class="k">${fmt(s.k)}</div></div>`
+  ).join("") + `</div>`;
+}
+function bCallout(c){
+  if (!c) return "";
+  const arr = Array.isArray(c) ? c : [c];
+  return arr.map(x => `<div class="callout${x.tone ? " " + x.tone : ""}">` +
+    (x.tag ? `<span class="tag">${esc(x.tag)}</span>` : "") + fmt(x.text) + `</div>`).join("");
+}
+function bViz(s){
+  if (s.mermaid){
+    return `<div class="viz" data-viz="mermaid"><div class="inner">` +
+      `<pre class="mermaid-src">${esc(s.mermaid)}</pre></div>` +
+      `<span class="zoomhint">click to zoom</span></div>` +
+      (s.vizcap ? `<div class="figcap">${fmt(s.vizcap)}</div>` : "");
+  }
+  if (s.figure){
+    return `<div class="viz" data-viz="img"><div class="inner">` +
+      `<img src="${s.figure.src}" alt="${esc(s.figure.cap || "figure")}" loading="lazy">` +
+      `</div><span class="zoomhint">click to zoom</span></div>` +
+      (s.figure.cap ? `<div class="figcap">${fmt(s.figure.cap)}</div>` : "");
+  }
+  return "";
+}
+function bToc(items){
+  if (!items) return "";
+  return `<div class="toclist">` + items.map((t, i) =>
+    `<div class="tocitem"><div class="n">${t.n || (i + 1)}</div>` +
+    `<div class="t">${fmt(t.t)}</div><div class="d">${fmt(t.d)}</div></div>`).join("") + `</div>`;
+}
+function bMap(rows){
+  if (!rows) return "";
+  return `<div class="maprow">` + rows.map(r =>
+    `<div class="m"><div class="a">${fmt(r.from)}</div><div class="arw">→</div>` +
+    `<div class="b">${fmt(r.to)}</div></div>`).join("") + `</div>`;
+}
+
+/* ── slide renderer ───────────────────────────────────────────────── */
+function renderSlide(s, i){
+  const el = document.createElement("section");
+  el.className = "slide" + (s.type ? " " + s.type : "");
+  el.id = "slide-" + (i + 1);
+  el.dataset.i = i;
+
+  if (s.type === "cover"){
+    el.innerHTML =
+      (s.kicker ? `<div class="eyebrow">${fmt(s.kicker)}</div>` : "") +
+      `<h1>${fmt(s.title)}</h1>` +
+      (s.lead ? `<div class="thesis">${fmt(s.lead)}</div>` : "") +
+      (s.meta ? `<div class="meta">${s.meta.map(m => `<span><b>${esc(m.k)}</b> ${esc(m.v)}</span>`).join("")}</div>` : "");
+    return el;
+  }
+  if (s.type === "divider"){
+    el.innerHTML =
+      `<div class="big-num">${esc(s.num || "")}</div><h2>${fmt(s.title)}</h2>` +
+      (s.lead ? `<p>${fmt(s.lead)}</p>` : "");
+    return el;
+  }
+  if (s.type === "analogy"){
+    el.innerHTML =
+      (s.kicker ? `<div class="kicker">${fmt(s.kicker)}<span class="num">analogy</span></div>` : "") +
+      `<div class="analogy-wrap"><div class="icon">${esc(s.icon || "💡")}</div><div>` +
+        `<p class="metaphor">${fmt(s.metaphor)}</p>` + bMap(s.map) +
+        (s.foot ? `<div class="s-foot">${fmt(s.foot)}</div>` : "") +
+      `</div></div>`;
+    return el;
+  }
+
+  const head =
+    (s.kicker ? `<div class="kicker">${fmt(s.kicker)}${s.badge ? `<span class="num">${esc(s.badge)}</span>` : ""}</div>` : "") +
+    (s.title ? `<h2 class="s-title">${fmt(s.title)}</h2>` : "") +
+    (s.lead ? `<div class="lead">${fmt(s.lead)}</div>` : "");
+
+  const blocks =
+    bChips(s.chips) + bArrows(s.arrows) + bToc(s.toc) + bStats(s.stats) +
+    bCards(s.cards) + li(s.bullets) + bTable(s.table) + bCallout(s.callout);
+
+  let body;
+  if (s.layout === "split"){
+    const side = s.sideWide ? " wide-" + s.sideWide : "";
+    const left = `<div>${blocks}</div>`;
+    const right = `<div style="display:flex;flex-direction:column;min-height:0">${bViz(s)}</div>`;
+    body = `<div class="split${side}">${s.vizFirst ? right + left : left + right}</div>`;
+  } else {
+    body = `<div class="s-body">${blocks}${bViz(s)}</div>`;
+  }
+  el.innerHTML = head + body + (s.foot ? `<div class="s-foot">${fmt(s.foot)}</div>` : "");
+  return el;
+}
+
+/* ── build ────────────────────────────────────────────────────────── */
+SLIDES.forEach((s, i) => stage.appendChild(renderSlide(s, i)));
+const slideEls = Array.from(stage.children);
+$("#tot").textContent = SLIDES.length;
+
+SLIDES.forEach((s, i) => {
+  const d = document.createElement("div");
+  d.className = "thumb"; d.dataset.i = i;
+  d.innerHTML = `<div class="tin">` +
+    (s.kicker ? `<div class="tk">${esc(s.kicker)}</div>` : "") +
+    `<div class="tt">${esc(s.title || s.metaphor || "")}</div></div>` +
+    `<div class="tn">${i + 1}</div>`;
+  d.addEventListener("click", () => { setMode("deck"); go(i); });
+  grid.appendChild(d);
+});
+const thumbEls = Array.from(grid.children);
+
+/* ── scaling ──────────────────────────────────────────────────────── */
+function fit(){
+  const pad = 24;
+  const k = Math.min((innerWidth - pad) / 1280, (innerHeight - pad) / 720);
+  stage.style.transform = `scale(${k})`;
+}
+addEventListener("resize", fit); fit();
+
+/* ── mermaid ──────────────────────────────────────────────────────── */
+function mermaidTheme(){
+  return document.documentElement.getAttribute("data-theme") === "light" ? "default" : "dark";
+}
+let mermaidReady = false;
+function initMermaid(){
+  if (mermaidReady || typeof mermaid === "undefined") return;
+  mermaid.initialize({
+    startOnLoad: false, theme: mermaidTheme(), securityLevel: "loose",
+    fontSize: 15, suppressErrorRendering: true,
+    flowchart: { htmlLabels: true, curve: "basis", nodeSpacing: 34, rankSpacing: 42 },
+    mindmap: { padding: 12 }
+  });
+  mermaidReady = true;
+}
+async function renderMermaidIn(el){
+  if (typeof mermaid === "undefined"){
+    /* neither the vendored copy nor the CDN loaded — show the diagram source
+       rather than an empty panel, so the slide still carries its content */
+    el.querySelectorAll("pre.mermaid-src").forEach(pre => {
+      pre.style.display = "block";
+      pre.style.whiteSpace = "pre-wrap";
+      pre.style.font = "13px ui-monospace,Consolas,monospace";
+      pre.style.color = "var(--txt-dim)";
+      pre.style.margin = "0";
+    });
+    return;
+  }
+  initMermaid();
+  const srcs = el.querySelectorAll("pre.mermaid-src");
+  for (const pre of srcs){
+    const code = pre.dataset.src || pre.textContent;
+    pre.dataset.src = code;
+    const holder = pre.parentNode;
+    try{
+      const id = "mmd" + Math.random().toString(36).slice(2, 9);
+      const { svg } = await mermaid.render(id, code);
+      holder.innerHTML = svg;
+      /* mermaid pins an explicit width/height + max-width on the <svg>, which
+         leaves the diagram tiny inside a big slide panel. The viewBox is all we
+         need — let it scale to the container instead. */
+      const el2 = holder.querySelector("svg");
+      if (el2){
+        el2.removeAttribute("width"); el2.removeAttribute("height");
+        el2.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        el2.style.maxWidth = "100%"; el2.style.width = "100%"; el2.style.height = "100%";
+      }
+      holder.appendChild(pre);
+      pre.style.display = "none";
+    }catch(err){
+      holder.innerHTML = `<div style="color:var(--bad);font-size:14px">diagram failed to render</div>`;
+      holder.appendChild(pre);
+      console.warn("mermaid render failed on slide", el.id, err);
+    }
+  }
+}
+async function reRenderAllMermaid(){
+  if (typeof mermaid === "undefined") return;
+  mermaidReady = false; initMermaid();
+  for (const el of slideEls){
+    const pres = el.querySelectorAll("pre.mermaid-src");
+    for (const pre of pres){
+      if (!pre.dataset.src) continue;
+      const holder = pre.parentNode;
+      holder.innerHTML = "";
+      holder.appendChild(pre);
+      pre.style.display = "";
+    }
+    if (el.dataset.mmdDone) { el.dataset.mmdDone = ""; }
+  }
+  await renderMermaidIn(slideEls[idx]);
+  slideEls[idx].dataset.mmdDone = "1";
+}
+
+/* ── navigation ───────────────────────────────────────────────────── */
+async function go(n, opts){
+  opts = opts || {};
+  n = Math.max(0, Math.min(SLIDES.length - 1, n));
+  idx = n;
+  slideEls.forEach((el, i) => el.classList.toggle("current", i === n));
+  thumbEls.forEach((el, i) => el.classList.toggle("cur", i === n));
+  $("#cur").textContent = n + 1;
+  $("#progress").style.width = ((n + 1) / SLIDES.length * 100) + "%";
+
+  const el = slideEls[n];
+  if (!el.dataset.mmdDone){ await renderMermaidIn(el); el.dataset.mmdDone = "1"; }
+  /* pre-render the next slide's diagram so advancing never stutters */
+  const nx = slideEls[n + 1];
+  if (nx && !nx.dataset.mmdDone){ renderMermaidIn(nx).then(() => nx.dataset.mmdDone = "1"); }
+
+  const s = SLIDES[n];
+  $("#notebody").textContent = s.script || "(no script for this slide)";
+  const clip = AUDIO[s.id];
+  $("#notedur").textContent = clip && clip.dur ? `~${Math.round(clip.dur)}s narration` : "";
+  if (history.replaceState) history.replaceState(null, "", "#/" + (n + 1));
+
+  stopAudio();
+  if (opts.keepPlaying && clip) playAudio();
+}
+function next(){ if (idx < SLIDES.length - 1) go(idx + 1); else toast("End of deck"); }
+function prev(){ go(idx - 1); }
+
+/* ── audio ────────────────────────────────────────────────────────── */
+function clipFor(i){ const s = SLIDES[i]; return s && AUDIO[s.id] ? AUDIO[s.id] : null; }
+function stopAudio(){ au.pause(); au.removeAttribute("src"); au.load(); $("#b-play").textContent = "▶"; $("#b-play").classList.remove("on"); }
+function playAudio(){
+  const clip = clipFor(idx);
+  if (!clip){ toast("No narration for this slide yet"); return; }
+  au.src = clip.src;
+  au.play().then(() => {
+    $("#b-play").textContent = "❚❚"; $("#b-play").classList.add("on");
+  }).catch(err => toast("Audio blocked — click the page once, then press P"));
+}
+function toggleAudio(){
+  if (!au.paused && au.src){ au.pause(); $("#b-play").textContent = "▶"; $("#b-play").classList.remove("on"); return; }
+  if (au.src && au.currentTime > 0 && !au.ended){
+    au.play(); $("#b-play").textContent = "❚❚"; $("#b-play").classList.add("on"); return;
+  }
+  playAudio();
+}
+au.addEventListener("ended", () => {
+  $("#b-play").textContent = "▶"; $("#b-play").classList.remove("on");
+  if (autoAdv && idx < SLIDES.length - 1) go(idx + 1, { keepPlaying: true });
+});
+
+/* ── modes / overlays ─────────────────────────────────────────────── */
+function setMode(m){
+  document.body.dataset.mode = m;
+  $("#b-grid").classList.toggle("on", m === "grid");
+  if (m === "grid") stopAudio();
+}
+function toggleNotes(){
+  const on = document.body.dataset.notes === "1";
+  document.body.dataset.notes = on ? "0" : "1";
+  $("#b-notes").classList.toggle("on", !on);
+}
+function setTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  try{ localStorage.setItem("slides-theme", t); }catch(e){}
+  reRenderAllMermaid();
+}
+let toastTimer;
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), 1800);
+}
+
+/* ── lightbox ─────────────────────────────────────────────────────── */
+function applyLb(){ $("#lbinner").style.transform = `translate(${lbX}px,${lbY}px) scale(${lbScale})`; }
+function openLb(viz){
+  const node = viz.querySelector("svg, img");
+  if (!node) return;
+  const clone = node.cloneNode(true);
+  if (clone.tagName && clone.tagName.toLowerCase() === "svg"){
+    clone.removeAttribute("width"); clone.removeAttribute("height");
+    clone.style.width = "92vw"; clone.style.height = "86vh";
+  }
+  const inner = $("#lbinner");
+  inner.innerHTML = ""; inner.appendChild(clone);
+  lbScale = 1; lbX = 0; lbY = 0; applyLb();
+  $("#lb").classList.add("on");
+}
+function closeLb(){ $("#lb").classList.remove("on"); $("#lbinner").innerHTML = ""; }
+stage.addEventListener("click", e => {
+  const viz = e.target.closest(".viz");
+  if (viz) openLb(viz);
+});
+$("#lb-close").addEventListener("click", closeLb);
+$("#lb-in").addEventListener("click", () => { lbScale = Math.min(8, lbScale * 1.25); applyLb(); });
+$("#lb-out").addEventListener("click", () => { lbScale = Math.max(.2, lbScale / 1.25); applyLb(); });
+$("#lb-reset").addEventListener("click", () => { lbScale = 1; lbX = 0; lbY = 0; applyLb(); });
+$("#lb").addEventListener("click", e => { if (e.target.id === "lb" || e.target.id === "lbstage") closeLb(); });
+$("#lbstage").addEventListener("wheel", e => {
+  e.preventDefault();
+  lbScale = Math.max(.2, Math.min(8, lbScale * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  applyLb();
+}, { passive: false });
+(function(){
+  let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  const st = $("#lbstage");
+  st.addEventListener("pointerdown", e => {
+    dragging = true; sx = e.clientX; sy = e.clientY; ox = lbX; oy = lbY;
+    st.classList.add("drag"); st.setPointerCapture(e.pointerId);
+  });
+  st.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    lbX = ox + (e.clientX - sx); lbY = oy + (e.clientY - sy); applyLb();
+  });
+  st.addEventListener("pointerup", e => { dragging = false; st.classList.remove("drag"); });
+})();
+
+/* ── controls ─────────────────────────────────────────────────────── */
+$("#b-prev").addEventListener("click", prev);
+$("#b-next").addEventListener("click", next);
+$("#b-play").addEventListener("click", toggleAudio);
+$("#b-auto").addEventListener("click", () => {
+  autoAdv = !autoAdv; $("#b-auto").classList.toggle("on", autoAdv);
+  toast(autoAdv ? "Auto-advance on" : "Auto-advance off");
+});
+$("#b-notes").addEventListener("click", toggleNotes);
+$("#b-grid").addEventListener("click", () => setMode(document.body.dataset.mode === "grid" ? "deck" : "grid"));
+$("#b-theme").addEventListener("click", () => {
+  setTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+});
+$("#b-help").addEventListener("click", () => $("#help").classList.toggle("on"));
+$("#help").addEventListener("click", () => $("#help").classList.remove("on"));
+
+addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if (k === "Escape"){
+    if ($("#lb").classList.contains("on")) return closeLb();
+    if ($("#help").classList.contains("on")) return $("#help").classList.remove("on");
+    if (document.body.dataset.mode === "grid") return setMode("deck");
+    return;
+  }
+  if (k === "ArrowRight" || k === " " || k === "PageDown"){ e.preventDefault(); next(); return; }
+  if (k === "ArrowLeft" || k === "PageUp"){ e.preventDefault(); prev(); return; }
+  if (k === "Home"){ e.preventDefault(); go(0); return; }
+  if (k === "End"){ e.preventDefault(); go(SLIDES.length - 1); return; }
+  const low = k.toLowerCase();
+  if (low === "g"){ setMode(document.body.dataset.mode === "grid" ? "deck" : "grid"); return; }
+  if (low === "s"){ toggleNotes(); return; }
+  if (low === "p"){ toggleAudio(); return; }
+  if (low === "a"){ $("#b-auto").click(); return; }
+  if (low === "t"){ $("#b-theme").click(); return; }
+  if (low === "f"){
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => {});
+    return;
+  }
+  if (k === "?"){ $("#help").classList.toggle("on"); return; }
+});
+
+/* ── boot ─────────────────────────────────────────────────────────── */
+let saved = "dark";
+try{ saved = localStorage.getItem("slides-theme") || "dark"; }catch(e){}
+document.documentElement.setAttribute("data-theme", saved);
+initMermaid();
+
+function hashIndex(){
+  const m = location.hash.match(/^#\/(\d+)/);
+  const n = m ? parseInt(m[1], 10) : NaN;
+  return Number.isFinite(n) ? n - 1 : null;
+}
+addEventListener("hashchange", () => {
+  const n = hashIndex();
+  if (n !== null && n !== idx) go(n);
+});
+go(hashIndex() ?? 0);
+window.__deckReady = true;
+})();
+</script>
+</body>
+</html>
